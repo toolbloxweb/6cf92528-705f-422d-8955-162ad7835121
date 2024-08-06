@@ -188,6 +188,9 @@ contract ProfileWorkflow  is Initializable, OwnableUpgradeable, NonTransferrable
 	* `Id` (Integer) - Profile identifier
 	* `Name` (Text)
 	
+	#### Access Restrictions
+	Access is specifically restricted to the user with the address from the `Wallet` property. If `Wallet` property is not yet set then the method caller becomes the objects `Wallet`.
+	
 	#### Checks and updates
 	The following properties will be updated on blockchain:
 	
@@ -196,8 +199,10 @@ contract ProfileWorkflow  is Initializable, OwnableUpgradeable, NonTransferrable
 	function changeName(uint256 id,string calldata name) public returns (uint256) {
 		Profile memory item = getItem(id);
 		address oldOwner = getItemOwner(item);
+		_assertOrAssignWallet(item);
 		_assertStatus(item, 0);
 		_setItemIdByName(item, 0);
+		_setItemIdByWallet(item, 0);
 		item.name = name;
 		item.status = 0;
 		items[id] = item;
@@ -206,6 +211,7 @@ contract ProfileWorkflow  is Initializable, OwnableUpgradeable, NonTransferrable
 			_transfer(oldOwner, newOwner, id);
 		}
 		_setItemIdByName(item, id);
+		_setItemIdByWallet(item, id);
 		emit ItemUpdated(id, item.status);
 		return id;
 	}
