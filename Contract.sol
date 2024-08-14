@@ -10,6 +10,16 @@ import "https://raw.githubusercontent.com/OpenZeppelin/openzeppelin-contracts-up
 import "https://raw.githubusercontent.com/Ideevoog/Toolblox.Token/main/Contracts/WorkflowBaseUpgradeable.sol";
 /*
 	Toolblox smart-contract workflow: https://app.toolblox.net/summary/profile_test_profile_v1
+	# Description
+	
+	This contract serves as the holder for decentralized social network profile. The profile is an soulbound upgradeable NFT (ERC721).
+	 * It is upgradeable (OpenZeppelin Initializable) to be able to add new properties, states and state transitions in subsequent iterations of development - properties such as Rating, Friends, Bio and more.
+	 * It is an NFT (ERC721) to be able to verify and check data in NFT portals and wallets.
+	 * It is soulbound to the owner wallet address (non-transferrable).
+	
+	## Remarks
+	
+	The *Name* property of the profile will contain a hashed version of the username. Hashing will take place off-chain.
 */
 contract ProfileWorkflow  is Initializable, OwnableUpgradeable, NonTransferrableERC721Upgradeable, WorkflowBaseUpgradeable{
 	struct Profile {
@@ -106,26 +116,6 @@ contract ProfileWorkflow  is Initializable, OwnableUpgradeable, NonTransferrable
 		);
 		itemsByWallet[item.wallet] = id;
 	}
-	
-	mapping(string => uint) public itemsByName;
-	function getItemIdByName(string calldata name) public view returns (uint) {
-		return itemsByName[name];
-	}
-	function getItemByName(string calldata name) public view returns (Profile memory) {
-		return getItem(getItemIdByName(name));
-	}
-	function _setItemIdByName(Profile memory item, uint id) private {
-		if (bytes(item.name).length == 0)
-		{
-			return;
-		}
-		uint existingItemByName = itemsByName[item.name];
-		require(
-			existingItemByName == 0 || existingItemByName == item.id,
-			"Cannot set Name. Another item already exist with same value."
-		);
-		itemsByName[item.name] = id;
-	}
 	function getId(uint id) public view returns (uint){
 		return getItem(id).id;
 	}
@@ -166,14 +156,12 @@ contract ProfileWorkflow  is Initializable, OwnableUpgradeable, NonTransferrable
 		Profile memory item;
 		item.id = id;
 		_assertOrAssignWallet(item);
-		_setItemIdByName(item, 0);
 		_setItemIdByWallet(item, 0);
 		item.name = name;
 		item.status = 0;
 		items[id] = item;
 		address newOwner = getItemOwner(item);
 		_mint(newOwner, id);
-		_setItemIdByName(item, id);
 		_setItemIdByWallet(item, id);
 		emit ItemUpdated(id, item.status);
 		return id;
@@ -201,7 +189,6 @@ contract ProfileWorkflow  is Initializable, OwnableUpgradeable, NonTransferrable
 		address oldOwner = getItemOwner(item);
 		_assertOrAssignWallet(item);
 		_assertStatus(item, 0);
-		_setItemIdByName(item, 0);
 		_setItemIdByWallet(item, 0);
 		item.name = name;
 		item.status = 0;
@@ -210,7 +197,6 @@ contract ProfileWorkflow  is Initializable, OwnableUpgradeable, NonTransferrable
 		if (newOwner != oldOwner) {
 			_transfer(oldOwner, newOwner, id);
 		}
-		_setItemIdByName(item, id);
 		_setItemIdByWallet(item, id);
 		emit ItemUpdated(id, item.status);
 		return id;
