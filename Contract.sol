@@ -3,13 +3,14 @@
 // Unauthorized copying, modification, or distribution is strictly prohibited.
 // For licensing inquiries or permissions, contact info@toolblox.net.
 pragma solidity ^0.8.20;
-import "https://raw.githubusercontent.com/OpenZeppelin/openzeppelin-contracts-upgradeable/v5.0.2/contracts/proxy/utils/Initializable.sol";
-import "https://raw.githubusercontent.com/OpenZeppelin/openzeppelin-contracts-upgradeable/v5.0.2/contracts/access/OwnableUpgradeable.sol";
-import "https://raw.githubusercontent.com/Ideevoog/Toolblox.Token/main/Contracts/NonTransferrableERC721Upgradeable.sol";
-import "https://raw.githubusercontent.com/OpenZeppelin/openzeppelin-contracts-upgradeable/v5.0.2/contracts/token/ERC721/ERC721Upgradeable.sol";
-import "https://raw.githubusercontent.com/Ideevoog/Toolblox.Token/main/Contracts/WorkflowBaseUpgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import "@openzeppelin/contracts-upgradeable/access/OwnableUpgradeable.sol";
+import "@tool_blox/contracts/contracts/NonTransferrableERC721Upgradeable.sol";
+import "@openzeppelin/contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
+import "@tool_blox/contracts/contracts/WorkflowBaseUpgradeable.sol";
+import "@tool_blox/contracts/contracts/utils/Validate.sol";
 /*
-	Toolblox smart-contract workflow: https://app.toolblox.net/summary/profile_test_profile_v1
+	Toolblox smart-contract workflow: https://app.toolblox.net/summary/rddtor_profile_contract_v1
 	# Description
 	
 	This contract serves as the holder for decentralized social network profile. The profile is an soulbound upgradeable NFT (ERC721).
@@ -40,10 +41,10 @@ contract ProfileWorkflow  is Initializable, OwnableUpgradeable, NonTransferrable
 		}
 		item.wallet = _msgSender();
 	}
-	function initialize(address _newOwner) public initializer {
+	function initialize(address _newOwner, string memory tokenName, string memory tokenSymbol) public initializer onlyInitializing {
 		__Ownable_init(_newOwner);
 		__NonTransferrableERC721_init();
-		__ERC721_init("Profile - PROFILE test profile v1", "PROFILE");
+		__ERC721_init(tokenName, tokenSymbol);
 		__WorkflowBase_init();
 	}
     struct AddressSlot {
@@ -116,6 +117,26 @@ contract ProfileWorkflow  is Initializable, OwnableUpgradeable, NonTransferrable
 		);
 		itemsByWallet[item.wallet] = id;
 	}
+	
+	mapping(string => uint) public itemsByName;
+	function getItemIdByName(string calldata name) public view returns (uint) {
+		return itemsByName[name];
+	}
+	function getItemByName(string calldata name) public view returns (Profile memory) {
+		return getItem(getItemIdByName(name));
+	}
+	function _setItemIdByName(Profile memory item, uint id) private {
+		if (bytes(item.name).length == 0)
+		{
+			return;
+		}
+		uint existingItemByName = itemsByName[item.name];
+		require(
+			existingItemByName == 0 || existingItemByName == item.id,
+			"Cannot set Name. Another item already exist with same value."
+		);
+		itemsByName[item.name] = id;
+	}
 	function getId(uint id) public view returns (uint){
 		return getItem(id).id;
 	}
@@ -147,6 +168,10 @@ contract ProfileWorkflow  is Initializable, OwnableUpgradeable, NonTransferrable
 	Access is specifically restricted to the user with the address from the `Wallet` property. If `Wallet` property is not yet set then the method caller becomes the objects `Wallet`.
 	
 	#### Checks and updates
+	The following checks are done before any changes take place:
+	
+	* The condition ``Validate.NotEmpty( Name ) && Validate.OnlyAlphaNumAndSpace( Name )`` needs to be true or the following error will be returned: *"Invalid name"*.
+	
 	The following properties will be updated on blockchain:
 	
 	* `Name` (String)
@@ -156,12 +181,15 @@ contract ProfileWorkflow  is Initializable, OwnableUpgradeable, NonTransferrable
 		Profile memory item;
 		item.id = id;
 		_assertOrAssignWallet(item);
+		require(Validate.notEmpty( name ) && Validate.onlyAlphaNumAndSpace( name ), "Invalid name");
+		_setItemIdByName(item, 0);
 		_setItemIdByWallet(item, 0);
 		item.name = name;
 		item.status = 0;
 		items[id] = item;
 		address newOwner = getItemOwner(item);
-		_mint(newOwner, id);
+		_safeMint(newOwner, id);
+		_setItemIdByName(item, id);
 		_setItemIdByWallet(item, id);
 		emit ItemUpdated(id, item.status);
 		return id;
@@ -180,6 +208,10 @@ contract ProfileWorkflow  is Initializable, OwnableUpgradeable, NonTransferrable
 	Access is specifically restricted to the user with the address from the `Wallet` property. If `Wallet` property is not yet set then the method caller becomes the objects `Wallet`.
 	
 	#### Checks and updates
+	The following checks are done before any changes take place:
+	
+	* The condition ``Validate.NotEmpty( Name ) && Validate.OnlyAlphaNumAndSpace( Name )`` needs to be true or the following error will be returned: *"Invalid name"*.
+	
 	The following properties will be updated on blockchain:
 	
 	* `Name` (String)
@@ -189,6 +221,8 @@ contract ProfileWorkflow  is Initializable, OwnableUpgradeable, NonTransferrable
 		address oldOwner = getItemOwner(item);
 		_assertOrAssignWallet(item);
 		_assertStatus(item, 0);
+		require(Validate.notEmpty( name ) && Validate.onlyAlphaNumAndSpace( name ), "Invalid name");
+		_setItemIdByName(item, 0);
 		_setItemIdByWallet(item, 0);
 		item.name = name;
 		item.status = 0;
@@ -197,6 +231,7 @@ contract ProfileWorkflow  is Initializable, OwnableUpgradeable, NonTransferrable
 		if (newOwner != oldOwner) {
 			_transfer(oldOwner, newOwner, id);
 		}
+		_setItemIdByName(item, id);
 		_setItemIdByWallet(item, id);
 		emit ItemUpdated(id, item.status);
 		return id;
