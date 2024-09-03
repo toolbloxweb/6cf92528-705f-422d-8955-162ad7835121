@@ -161,9 +161,6 @@ contract ProfileWorkflow  is Initializable, OwnableUpgradeable, AccessControlUpg
 		);
 		itemsByName[item.name] = id;
 	}
-    function _increaseBalance(address account, uint128 amount) internal virtual override(ERC721Upgradeable) {
-        super._increaseBalance(account, amount);
-    }
 	function _baseURI() internal view virtual override returns (string memory) {
 		return _baseUri;
 	}
